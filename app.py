@@ -1,40 +1,46 @@
 import streamlit as st
+import os
+from dotenv import load_dotenv
 
-st.title("サンプルアプリ②: 少し複雑なWebアプリ")
+load_dotenv()
 
-st.write("##### 動作モード1: 文字数カウント")
-st.write("入力フォームにテキストを入力し、「実行」ボタンを押すことで文字数をカウントできます。")
-st.write("##### 動作モード2: BMI値の計算")
-st.write("身長と体重を入力することで、肥満度を表す体型指数のBMI値を算出できます。")
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
 
-selected_item = st.radio(
-    "動作モードを選択してください。",
-    ["文字数カウント", "BMI値の計算"]
-)
+def ask_llm(user_text: str, expert: str) -> str:
+    if expert == "専門家A":
+        system_msg = "あなたは厳格な専門家Aです。結論→根拠→指摘を箇条書きで短く答えてください。"
+    else:
+        system_msg = "あなたは優しい専門家Bです。初心者向けに、手順を小さく分けて答えてください。"
 
-st.divider()
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_msg),
+        ("human", "{text}")
+    ])
 
-if selected_item == "文字数カウント":
-    input_message = st.text_input(label="文字数のカウント対象となるテキストを入力してください。")
-    text_count = len(input_message)
-else:
-    height = st.text_input(label="身長（cm）を入力してください。")
-    weight = st.text_input(label="体重（kg）を入力してください。")
+    llm = ChatOpenAI(model="gpt-4o-mini")
+
+    chain = prompt | llm
+    result = chain.invoke({"text": user_text})
+    return result.content
+
+
+st.title("LLMアプリ（練習）")
+st.write("専門家A/Bを切り替えて、入力文に応答します（まずはダミー返答）。")
+
+expert = st.radio("専門家を選んでください", ["専門家A", "専門家B"])
+user_text = st.text_area("入力", placeholder="ここに文章を入れてください")
 
 if st.button("実行"):
-    st.divider()
+    if not user_text.strip():
+        st.warning("入力が空です。文章を入れてください。")
+        st.stop()
 
-    if selected_item == "文字数カウント":
-        if input_message:
-            st.write(f"文字数: **{text_count}**")
-        else:
-            st.error("カウント対象となるテキストを入力してから「実行」ボタンを押してください。")
-    else:
-        if height and weight:
-            try:
-                bmi = round(int(weight) / ((int(height)/100) ** 2), 1)
-                st.write(f"BMI値: {bmi}")
-            except ValueError:
-                st.error("身長と体重は数値で入力してください。")
-        else:
-            st.error("身長と体重をどちらも入力してください。")
+    st.divider()
+    st.write("選択:", expert)
+    st.write("入力:", user_text)
+
+    # まずはダミー（LLMにする前の段階）
+    response = ask_llm(user_text, expert)
+    st.success(response)    
+
